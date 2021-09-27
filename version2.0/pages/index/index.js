@@ -17,4 +17,8 @@ Page({
         })
       });
   },
+
+  onclick(eve) {
+    FFC.track('开始使用点击事件');
+  },
 })
