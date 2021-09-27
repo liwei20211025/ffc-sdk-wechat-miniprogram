@@ -218,8 +218,6 @@ module.exports = {
       });
     });
   },
-
-
   experimentsPage() {
     // 重写page函数，增加阿里云监控和日志记录
     wx.setStorage({
@@ -242,11 +240,11 @@ module.exports = {
           let userInfo = JSON.parse(wx.getStorageSync("ffc-userinfo"));
           pageViews.push({
             route: route,
-            timeStamp: Math.round(new Date().getTime()),
             type: 'pageview',
             user: userInfo,
-            applicationType: 'MiniProgram',
-            secret: secretKey
+            appType: 'MiniProgram',
+            secret: secretKey,
+            eventName: 'pageview'
           })
           wx.setStorage({
             key: storageKey,
@@ -257,7 +255,6 @@ module.exports = {
         })
         // console.log(obj)
       }
-
 
       Object.keys(obj).forEach((methodName) => {
         const originMethod = obj[methodName];
@@ -275,12 +272,15 @@ module.exports = {
               let userInfo = JSON.parse(wx.getStorageSync("ffc-userinfo"));
               pageViews.push({
                 route: route,
-                timeStamp: Math.round(new Date().getTime()),
-                type: 'tap',
+                type: 'click',
                 user: userInfo,
-                applicationType: 'MiniProgram',
+                appType: 'MiniProgram',
                 secret: secretKey,
-                methodName: methodName
+                eventName: 'click',
+                customizedProperties: [{
+                  name: 'methodnanme',
+                  value: methodName
+                }]
               })
               wx.setStorage({
                 key: storageKey,
@@ -295,6 +295,7 @@ module.exports = {
       return oldPage(obj)
     }
   },
+  // here message is the eventname
   track(message, eventType, methodName, customizedProperties) {
     wx.nextTick(() => {
       // console.log("track");
@@ -304,22 +305,19 @@ module.exports = {
       let secretKey = wx.getStorageSync("ffc-secretkey")
       let userInfo = JSON.parse(wx.getStorageSync("ffc-userinfo"));
       pageViews.push({
-        timeStamp: Math.round(new Date().getTime()),
         type: 'customEvent',
-        message: message,
+        eventName: message,
         eventType: eventType,
         customizedProperties: customizedProperties,
         user: userInfo,
-        applicationType: 'MiniProgram',
+        appType: 'MiniProgram',
         secret: secretKey,
-        methodName: methodName
+        customizedProperties
       })
       wx.setStorage({
         key: storageKey,
         data: JSON.stringify(pageViews)
       });
-      if (oldOnShow !== undefined)
-        oldOnShow.call(this);
     })
   },
   sendTelemetryToServer(defaultRootUri) {
