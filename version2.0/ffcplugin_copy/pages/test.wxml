@@ -1,0 +1,1 @@
+<button bindtap="onTestClick" id="test">测试点击事件捕获</button>
