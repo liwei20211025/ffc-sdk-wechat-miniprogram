@@ -1,3 +1,7 @@
+import * as KEY from "./config";
+import { getEventName } from "./utils/request_eventName";
+import { idRouteEquals } from "./utils/id_route_equals";
+
 module.exports = {
 
   defaultRootUri: '',
@@ -7,36 +11,43 @@ module.exports = {
     "ffUserName": "",
     "ffUserEmail": "",
     "ffUserKeyId": "",
-    "ffUserCustomizedProperties": [
-    ]
+    "ffUserCustomizedProperties": []
   },
   featureFlags: [],
-  storageKey: 'ffc-sdk-wechat-miniprogram',
+  storageKey: KEY.storageKey_sdk,
   timer: null,
-  init(
-    secretKey = '',
-    sameFlagCallMinimumInterval = 15) {
+  eventNames: [],
+
+  init(secretKey = '', sameFlagCallMinimumInterval = 15) {
     this.secretKey = secretKey;
-    this.defaultRootUri = 'https://api.feature-flags.co';
+    this.defaultRootUri = KEY.defaultUrl;
     this.sameFlagCallMinimumInterval = sameFlagCallMinimumInterval;
     this.featureFlags = this.getStorage();
 
     wx.setStorage({
-      key: "ffc-userinfo",
+      key: KEY.storageKey_user,
       data: JSON.stringify(this.userInfo)
     });    
     wx.setStorage({
-      key: "ffc-secretkey",
+      key: KEY.storageKey_secret,
       data: this.secretKey
     });
 
+    this.initEventNames();
     this.experimentsPage();
 
     let defaultRootUri = this.defaultRootUri;
-    this.timer = setInterval(()=>{
+    this.timer = setTimeout(()=>{
       this.sendTelemetryToServer(defaultRootUri)
     }, 5000);
   },
+
+  // 初始化 eventName
+  async initEventNames() {
+    let result = await getEventName(this.secretKey);
+    this.eventNames = result;
+  },
+
   initFFUserInfo(userInfo) {
     this.userInfo = userInfo;
     wx.setStorage({
@@ -218,83 +229,130 @@ module.exports = {
       });
     });
   },
+
   experimentsPage() {
-    // 重写page函数，增加阿里云监控和日志记录
     wx.setStorage({
-      key: "ffc-sdk-wechat-miniprogram-pageview",
+      key: KEY.storageKey_pageview,
       data: JSON.stringify([])
     });
-    let oldPage = Page
-    Page = function (obj) {
-      // console.log(obj);
-      let oldOnShow = obj.onShow
-      obj.onShow = function () {
-        // console.log(this)
-        let route = this.route;
-        wx.nextTick(() => {
-          // console.log("nextTick");
-          let storageKey = "ffc-sdk-wechat-miniprogram-pageview";
-          let pageViewsStr = wx.getStorageSync(storageKey);
-          let pageViews = JSON.parse(pageViewsStr);
-          let secretKey = wx.getStorageSync("ffc-secretkey")
-          let userInfo = JSON.parse(wx.getStorageSync("ffc-userinfo"));
-          pageViews.push({
-            route: route,
-            type: 'pageview',
-            user: userInfo,
-            appType: 'MiniProgram',
-            secret: secretKey,
-            eventName: 'pageview'
-          })
-          wx.setStorage({
-            key: storageKey,
-            data: JSON.stringify(pageViews)
-          });
-          if (oldOnShow !== undefined)
-            oldOnShow.call(this);
-        })
-        // console.log(obj)
-      }
 
-      Object.keys(obj).forEach((methodName) => {
-        const originMethod = obj[methodName];
-        if (typeof originMethod !== "function") {
-          return true;
-        }
-        (obj)[methodName] = function (...args) {
-          if (args && args[0] && args[0].type == 'tap' && args[0]._userTap) {
-            let route = this.route;
-            wx.nextTick(() => {
-              let storageKey = "ffc-sdk-wechat-miniprogram-pageview";
-              let pageViewsStr = wx.getStorageSync(storageKey);
-              let pageViews = JSON.parse(pageViewsStr);
-              let secretKey = wx.getStorageSync("ffc-secretkey");
-              let userInfo = JSON.parse(wx.getStorageSync("ffc-userinfo"));
-              pageViews.push({
-                route: route,
-                type: 'click',
-                user: userInfo,
-                appType: 'MiniProgram',
-                secret: secretKey,
-                eventName: 'click',
-                customizedProperties: [{
-                  name: 'methodnanme',
-                  value: methodName
-                }]
-              })
-              wx.setStorage({
-                key: storageKey,
-                data: JSON.stringify(pageViews)
-              });
-            })
-          }
+    this.rewritePage(this.rewriteOnShowFunc, this.rewriteEventListener);
+  },
 
-          return originMethod.call(this, ...args);
-        };
-      });
-      return oldPage(obj)
+  // 重写 Page 构造器
+  rewritePage(rewriteFunc, rewriteEvent) {
+    let oldPage = Page;
+
+    // 重写page函数，增加阿里云监控和日志记录
+    Page = (obj) => {
+      rewriteFunc(obj, this);
+      rewriteEvent(obj, this);
+      return oldPage(obj);
     }
   },
+
+  // 重写 onShow 生命周期函数
+  rewriteOnShowFunc(obj, that) {
+    let oldOnShow = obj.onShow;
+    obj.onShow = function() {
+
+      let route = this.route;
+      wx.nextTick(() => {
+        let storageKey = KEY.storageKey_pageview;
+        let pageViewsStr = wx.getStorageSync(storageKey);
+        let pageViews = JSON.parse(pageViewsStr);
+        let secretKey = wx.getStorageSync(KEY.storageKey_secret);
+        let userInfo = JSON.parse(wx.getStorageSync(KEY.storageKey_user));
+        
+        pageViews.push({
+          route: route,
+          type: KEY.pageview_type,
+          user: userInfo,
+          appType: KEY.appType,
+          secret: secretKey,
+          eventName: 'pageview'
+        });
+
+        wx.setStorage({
+          key: storageKey,
+          data: JSON.stringify(pageViews)
+        });
+        
+        oldOnShow && oldOnShow.call(that); 
+      })
+    }
+  },
+
+  // 重写事件监听
+  rewriteEventListener(obj, that) {
+
+    Object.keys(obj).forEach((key) => {
+
+      const pageProperty = obj[key];
+
+      if(typeof pageProperty === "function") {
+        let oldMethod = pageProperty;
+        
+        obj[key] = function(event) {
+
+          (event && event.type && event.type === 'tap') && (() => {
+            
+            wx.nextTick(() => {
+              let route = this.route;
+              let id = event.currentTarget.id;
+              let eventName = idRouteEquals(that.eventNames, id, route);
+
+              if(eventName) {
+                
+                let secretKey = wx.getStorageSync(KEY.storageKey_secret)
+                let userInfo = JSON.parse(wx.getStorageSync(KEY.storageKey_user));
+
+                wx.setStorageSync(KEY.storageKey_pagevent, JSON.stringify({
+                  route,
+                  secret: secretKey,
+                  eventName: eventName,
+                  user: userInfo,
+                  appType: KEY.appType,
+                  type: KEY.pagevent_type
+                }))
+
+                that.setClickEventParams();
+              }
+            })
+
+          })();
+
+          oldMethod.call(this);
+        }
+      }
+    })
+  },
+
+  // 处理点击事件监听参数
+  async setClickEventParams() {
+    let storageKey = KEY.storageKey_pagevent;
+    let pageventStr = wx.getStorageSync(storageKey);
+  
+    wx.setStorage({
+      key: storageKey,
+      data: JSON.stringify({})
+    });
+    let pagevent = [JSON.parse(pageventStr)];
+
+    let url = this.defaultRootUri + '/ExperimentsDataReceiver/PushData';
+
+    await this.checkVariationAsync("小程序开关");
+    this.sendRequest(url, pagevent, this.clickEventSuccess, this.clickEventFailed)
+  },
+
+  clickEventSuccess(result) {
+    console.log(result)
+  },
+
+  clickEventFailed(error) {
+    console.log(error)
+  },
+
   // here message is the eventname
   track(message, eventType, methodName, customizedProperties) {
     wx.nextTick(() => {
@@ -356,5 +414,17 @@ module.exports = {
         }
       });
     }
+  },
+
+  // 发送请求
+  sendRequest(url, data, success, fail) {
+    wx.request({
+      url,
+      data,
+      header: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      fail,
+      success
+    });
   }
 }

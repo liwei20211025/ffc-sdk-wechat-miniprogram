@@ -1,6 +1,6 @@
 // app.js
-// const FFC = require('./ffcplugin/index');
-const FFC = require("./ffcplugin_copy/index");
+const FFC = require('./ffcplugin/index');
+// const FFC = require("./ffcplugin_copy/index");
 
 App({
   onLaunch() {
