@@ -1,6 +1,7 @@
 import * as KEY from "./config";
 import { getEventName } from "./utils/request_eventName";
 import { idRouteEquals } from "./utils/id_route_equals";
+import { routeEquals } from "./utils/route_equals";
 
 module.exports = {
 
@@ -18,7 +19,7 @@ module.exports = {
   timer: null,
   eventNames: [],
 
-  init(secretKey = '', sameFlagCallMinimumInterval = 15) {
+  async init(secretKey = '', sameFlagCallMinimumInterval = 15) {
     this.secretKey = secretKey;
     this.defaultRootUri = KEY.defaultUrl;
     this.sameFlagCallMinimumInterval = sameFlagCallMinimumInterval;
@@ -33,19 +34,28 @@ module.exports = {
       data: this.secretKey
     });
 
-    this.initEventNames();
     this.experimentsPage();
 
-    let defaultRootUri = this.defaultRootUri;
-    this.timer = setTimeout(()=>{
-      this.sendTelemetryToServer(defaultRootUri)
-    }, 5000);
+    this.eventNames = await this.initEventNames();
   },
 
   // 初始化 eventName
-  async initEventNames() {
-    let result = await getEventName(this.secretKey);
-    this.eventNames = result;
+  initEventNames() {
+    let url = `${this.defaultRootUri}/api/Experiments/${this.secretKey}`;
+
+    return new Promise((resolve, reject) => {
+      wx.request({
+        url,
+        header: { 'Content-Type': 'application/json' },
+        method: 'GET',
+        fail: function (res) {
+          reject(res)
+        },
+        success: (result) => {
+          resolve(result.data);
+        }
+      });
+    })
   },
 
   initFFUserInfo(userInfo) {
@@ -235,14 +245,12 @@ module.exports = {
       key: KEY.storageKey_pageview,
       data: JSON.stringify([])
     });
-
     this.rewritePage(this.rewriteOnShowFunc, this.rewriteEventListener);
   },
 
   // 重写 Page 构造器
   rewritePage(rewriteFunc, rewriteEvent) {
     let oldPage = Page;
-
     // 重写page函数，增加阿里云监控和日志记录
     Page = (obj) => {
       rewriteFunc(obj, this);
@@ -257,29 +265,36 @@ module.exports = {
     obj.onShow = function() {
 
       let route = this.route;
-      wx.nextTick(() => {
-        let storageKey = KEY.storageKey_pageview;
-        let pageViewsStr = wx.getStorageSync(storageKey);
-        let pageViews = JSON.parse(pageViewsStr);
-        let secretKey = wx.getStorageSync(KEY.storageKey_secret);
-        let userInfo = JSON.parse(wx.getStorageSync(KEY.storageKey_user));
-        
-        pageViews.push({
-          route: route,
-          type: KEY.pageview_type,
-          user: userInfo,
-          appType: KEY.appType,
-          secret: secretKey,
-          eventName: 'pageview'
-        });
 
-        wx.setStorage({
-          key: storageKey,
-          data: JSON.stringify(pageViews)
-        });
-        
+      this.timer = setTimeout(() => {
+        let eventName = routeEquals(that.eventNames, route);
+
+        if(eventName) {
+          let storageKey = KEY.storageKey_pageview;
+          let pageViewsStr = wx.getStorageSync(storageKey);
+          let pageViews = JSON.parse(pageViewsStr);
+          let secretKey = wx.getStorageSync(KEY.storageKey_secret);
+          let userInfo = JSON.parse(wx.getStorageSync(KEY.storageKey_user));
+          
+          pageViews.push({
+            route: route,
+            type: KEY.pageview_type,
+            user: userInfo,
+            appType: KEY.appType,
+            secret: secretKey,
+            eventName: eventName
+          });
+
+          wx.setStorage({
+            key: storageKey,
+            data: JSON.stringify(pageViews)
+          });
+
+          that.sendTelemetryToServer(that.defaultRootUri)
+        }
+
         oldOnShow && oldOnShow.call(that); 
-      })
+      }, 500)
     }
   },
 
@@ -319,7 +334,6 @@ module.exports = {
                 that.setClickEventParams();
               }
             })
-
           })();
 
           oldMethod.call(this);
@@ -387,6 +401,7 @@ module.exports = {
     });
     let pageViews = JSON.parse(pageViewsStr);
     let failedEvet = [];
+    console.log(pageViews)
     if (pageViews && pageViews.length > 0) {
       wx.request({
         url: defaultRootUri + '/ExperimentsDataReceiver/PushData',
