@@ -6,7 +6,7 @@
 
 <view class="cu-bar" hidden="{{!showVersion[1]}}">
 	<view class="action">
-		<button bindtap="onclick" id="test">程序员版1</button>
+		<button bindtap="onclick" id="test">{{btnName}}</button>
 	</view>
 </view>
 

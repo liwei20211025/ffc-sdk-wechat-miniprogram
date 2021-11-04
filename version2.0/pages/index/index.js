@@ -3,7 +3,9 @@ const FFC = require('../../ffcplugin/index')
 Page({
   data: {
     versionText: 'ad',
-    showVersion: [false, false, false]
+    showVersion: [false, false, false],
+    btnName: "程序员版",
+    btnShow: true
   },
   onLoad() {
     FFC.checkVariation(
@@ -15,8 +17,18 @@ Page({
         this.setData({
           showVersion: versions 
         })
+    });
+
+    setTimeout(() => {
+      const query = wx.createSelectorQuery().in(this);
+      console.log(query.select("#test"))
+      query.select("#test")._component.setData({
+        btnShow: false
       });
+    }, 1000)
   },
 
-  onclick(eve) { }
+  onclick(event) {
+
+  }
 })

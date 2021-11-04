@@ -262,8 +262,7 @@ module.exports = {
   // 重写 onShow 生命周期函数
   rewriteOnShowFunc(obj, that) {
     let oldOnShow = obj.onShow;
-    obj.onShow = function() {
-
+    obj.onShow = function(args) {
       let route = this.route;
 
       this.timer = setTimeout(() => {
@@ -392,6 +391,7 @@ module.exports = {
       });
     })
   },
+
   sendTelemetryToServer(defaultRootUri) {
     let storageKey = "ffc-sdk-wechat-miniprogram-pageview";
     let pageViewsStr = wx.getStorageSync(storageKey);
@@ -401,7 +401,7 @@ module.exports = {
     });
     let pageViews = JSON.parse(pageViewsStr);
     let failedEvet = [];
-    console.log(pageViews)
+    
     if (pageViews && pageViews.length > 0) {
       wx.request({
         url: defaultRootUri + '/ExperimentsDataReceiver/PushData',

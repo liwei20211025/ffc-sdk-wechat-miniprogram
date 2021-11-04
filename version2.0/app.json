@@ -1,8 +1,7 @@
 {
   "entryPagePath": "pages/index/index",
   "pages": [
-    "pages/index/index",
-    "ffcplugin_copy/pages/test"
+    "pages/index/index"
   ],
   "plugins": {
     "ffc-sdk-wechat-miniprogram": {

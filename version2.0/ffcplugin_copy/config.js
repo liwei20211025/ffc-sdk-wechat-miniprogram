@@ -1,9 +1,0 @@
-export const defaultUrl = "https://api.feature-flags.co";
-export const storageKey_sdk = "ffc-sdk-wechat-miniprogram";
-export const storageKey_user = "ffc-userinfo";
-export const storageKey_secret = "ffc-secretkey";
-export const storageKey_pageview = "ffc-sdk-wechat-miniprogram-pageview";
-export const storageKey_pagevent = "ffc-sdk-wechat-miniprogram-event";
-export const appType = "MiniProgram";
-export const pageview_type = "pageview";
-export const pagevent_type = "Click";
