@@ -9,9 +9,9 @@ Page({
   },
   onLoad() {
     FFC.checkVariation(
-      '主页---话术版本',
+      '小程序开关',
       e => {
-        let versions = [false, false, false];
+        let versions = [false, true, false];
         let variations = ['产品经理版1', '程序员版1', '产品经理版2'];
         versions[variations.indexOf(e.variationValue)] = true;
         this.setData({
@@ -19,16 +19,18 @@ Page({
         })
     });
 
-    setTimeout(() => {
-      const query = wx.createSelectorQuery().in(this);
-      console.log(query.select("#test"))
-      query.select("#test")._component.setData({
-        btnShow: false
-      });
-    }, 1000)
+    // setTimeout(() => {
+    //   const query = wx.createSelectorQuery().in(this);
+    //   query.select("#test")._component.setData({
+    //     btnShow: false
+    //   });
+    // }, 1000)
   },
 
   onclick(event) {
+  },
 
+  onclick1(event) {
+    FFC.track('自定义事件');
   }
 })

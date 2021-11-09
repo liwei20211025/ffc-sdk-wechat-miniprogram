@@ -5,8 +5,9 @@
 </view>
 
 <view class="cu-bar" hidden="{{!showVersion[1]}}">
-	<view class="action">
-		<button bindtap="onclick" id="test">{{btnName}}</button>
+	<view class="action" class="btn">
+		<button class="btn" bindtap="onclick" id="test">{{btnName}}</button>
+		<button class="btn" bindtap="onclick1">触发自定义事件</button>
 	</view>
 </view>
 

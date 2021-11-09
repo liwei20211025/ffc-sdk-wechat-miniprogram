@@ -18,6 +18,7 @@ module.exports = {
   storageKey: KEY.storageKey_sdk,
   timer: null,
   eventNames: [],
+  featureFlagKeyName: "",
 
   async init(secretKey = '', sameFlagCallMinimumInterval = 15) {
     this.secretKey = secretKey;
@@ -33,6 +34,10 @@ module.exports = {
       key: KEY.storageKey_secret,
       data: this.secretKey
     });
+    wx.setStorage({
+      data: JSON.stringify([]),
+      key: KEY.storageKey_customevent,
+    })
 
     this.experimentsPage();
 
@@ -143,6 +148,10 @@ module.exports = {
     featureFlagKeyName,
     action,
     returnValueWhenUnhandledException = { localId: -1, variationValue: 'error' }) {
+
+    // 保存开关名字
+    this.featureFlagKeyName = featureFlagKeyName;
+    
     let body = {
       ffUserName: this.userInfo.ffUserName,
       ffUserEmail: this.userInfo.ffUserEmail,
@@ -188,6 +197,10 @@ module.exports = {
   checkVariationAsync(
     featureFlagKeyName,
     returnValueWhenUnhandledException = { localId: -1, variationValue: 'error' }) {
+
+    // 保存开关名字
+    this.featureFlagKeyName = featureFlagKeyName;
+
     let body = {
       ffUserName: this.userInfo.ffUserName,
       ffUserEmail: this.userInfo.ffUserEmail,
@@ -198,6 +211,7 @@ module.exports = {
     };
 
     let key = body.featureFlagKeyName + '@@' + body.ffUserKeyId;
+
     let lastFFVariation = this.featureFlags.find(p => p.key == key);
     let nowTimeStamp = Math.round(new Date().getTime() / 1000);
 
@@ -262,7 +276,7 @@ module.exports = {
   // 重写 onShow 生命周期函数
   rewriteOnShowFunc(obj, that) {
     let oldOnShow = obj.onShow;
-    obj.onShow = function(args) {
+    obj.onShow = function() {
       let route = this.route;
 
       this.timer = setTimeout(() => {
@@ -354,34 +368,28 @@ module.exports = {
 
     let url = this.defaultRootUri + '/ExperimentsDataReceiver/PushData';
 
-    await this.checkVariationAsync("小程序开关");
-    this.sendRequest(url, pagevent, this.clickEventSuccess, this.clickEventFailed)
+    await this.checkVariationAsync(this.featureFlagKeyName);
+    this.sendRequest(url, pagevent, (result) => {
+
+    }, (result) => {
+
+    });
   },
 
-  clickEventSuccess(result) {
-    console.log(result)
-  },
-
-  clickEventFailed(error) {
-    console.log(error)
-  },
-
-  // here message is the eventname
-  track(message, eventType, methodName, customizedProperties) {
+  // 自定义事件
+  track(eventName, eventType, methodName, customizedProperties) {
     wx.nextTick(() => {
-      // console.log("track");
-      let storageKey = "ffc-sdk-wechat-miniprogram-pageview";
+      let storageKey = KEY.storageKey_customevent;
       let pageViewsStr = wx.getStorageSync(storageKey);
       let pageViews = JSON.parse(pageViewsStr);
-      let secretKey = wx.getStorageSync("ffc-secretkey")
-      let userInfo = JSON.parse(wx.getStorageSync("ffc-userinfo"));
+      let secretKey = wx.getStorageSync(KEY.storageKey_secret);
+      let userInfo = JSON.parse(wx.getStorageSync(KEY.storageKey_user));
       pageViews.push({
-        type: 'customEvent',
-        eventName: message,
+        type: KEY.customevent_type,
+        eventName: eventName,
         eventType: eventType,
-        customizedProperties: customizedProperties,
         user: userInfo,
-        appType: 'MiniProgram',
+        appType: KEY.appType,
         secret: secretKey,
         customizedProperties
       })
@@ -389,6 +397,30 @@ module.exports = {
         key: storageKey,
         data: JSON.stringify(pageViews)
       });
+
+      this.setCustomEventParams();
+    })
+  },
+
+  // 设置自定义事件参数
+  async setCustomEventParams() {
+    let storageKey = KEY.storageKey_customevent;
+    let customEventStr = wx.getStorageSync(storageKey);
+
+    wx.setStorage({
+      data: JSON.stringify([]),
+      key: storageKey,
+    })
+
+    let pageViews = JSON.parse(customEventStr);
+
+    let url = this.defaultRootUri + '/ExperimentsDataReceiver/PushData';
+
+    await this.checkVariationAsync(this.featureFlagKeyName);
+    this.sendRequest(url, pageViews, (result) => {
+
+    }, (result) => {
+
     })
   },
 
